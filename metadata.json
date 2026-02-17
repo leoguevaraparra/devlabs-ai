@@ -1,0 +1,5 @@
+{
+  "name": "Riwi DevLab Pro",
+  "description": "Un laboratorio virtual de programación profesional integrado con Gemini para evaluación en tiempo real y simulación de conexión LMS (Moodle). Diseñado para instituciones educativas.",
+  "requestFramePermissions": []
+}
