@@ -9,15 +9,20 @@ export const submitLtiGrade = async (
   const normalizedScore = score / 100;
 
   // Send grade to local backend middleware which handles LTI signing
+  // Use VITE_API_URL if defined, otherwise relative path (for proxy/same-origin)
+  const API_URL = import.meta.env.VITE_API_URL || '';
+
   try {
-    const response = await fetch('/api/grade', {
+    const response = await fetch(`${API_URL}/api/grade`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
+      // IMPORTANT: Send cookies (session) to backend
+      credentials: 'include',
       body: JSON.stringify({
-        score: score, // Backend converts this to 0.0-1.0
-        ltiData: ltiData // Optional: Pass context if backend is stateless (though ltijs uses cookies)
+        score: score,
+        ltiData: ltiData
       })
     });
 

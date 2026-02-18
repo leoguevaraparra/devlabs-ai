@@ -15,8 +15,10 @@ export const useLTI = () => {
     // Check for active backend session
     useEffect(() => {
         const checkBackendSession = async () => {
+            const API_URL = import.meta.env.VITE_API_URL || '';
             try {
-                const res = await fetch('/api/me');
+                // IMPORTANT: Send credentials to check if we have a session cookie
+                const res = await fetch(`${API_URL}/api/me`, { credentials: 'include' });
                 if (res.ok) {
                     const data = await res.json();
                     setMoodleState({
