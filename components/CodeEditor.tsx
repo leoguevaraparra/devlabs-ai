@@ -3,6 +3,8 @@ import AceEditor from 'react-ace';
 import { ProgrammingLanguage } from '../types';
 
 // Import Ace builds
+// Import Ace builds
+import 'ace-builds/src-noconflict/ace';
 import 'ace-builds/src-noconflict/mode-python';
 import 'ace-builds/src-noconflict/theme-monokai';
 import 'ace-builds/src-noconflict/theme-dracula';

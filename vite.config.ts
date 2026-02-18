@@ -21,22 +21,12 @@ export default defineConfig(() => {
       }
     },
     build: {
-      chunkSizeWarningLimit: 1000, // Increase warning limit to 1MB
+      chunkSizeWarningLimit: 1000,
       rollupOptions: {
         output: {
-          manualChunks(id) {
-            if (id.includes('node_modules')) {
-              if (id.includes('ace-builds') || id.includes('react-ace')) {
-                return 'editor-vendor';
-              }
-              if (id.includes('@google/genai')) {
-                return 'genai-vendor';
-              }
-              if (id.includes('react') || id.includes('react-dom')) {
-                return 'react-vendor';
-              }
-              return 'vendor'; // Remaining dependencies
-            }
+          manualChunks: {
+            vendor: ['react', 'react-dom'],
+            ace: ['ace-builds', 'react-ace']
           }
         }
       }
