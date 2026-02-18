@@ -23,13 +23,15 @@ export const useLTI = () => {
 
             try {
                 const headers: HeadersInit = {};
-                if (ltik) {
-                    headers['Authorization'] = `Bearer ${ltik}`;
-                    console.log("[LTI] Found LTIK in URL, using for Auth.");
-                }
+                // if (ltik) {
+                //    headers['Authorization'] = `Bearer ${ltik}`;
+                //    console.log("[LTI] Found LTIK in URL, using for Auth.");
+                // }
 
-                // IMPORTANT: Send credentials AND Authorization header
-                const res = await fetch(`${API_URL}/api/me`, {
+                // IMPORTANT: Send credentials AND ltik in Query String (ltijs fallback)
+                const fetchUrl = ltik ? `${API_URL}/api/me?ltik=${ltik}` : `${API_URL}/api/me`;
+
+                const res = await fetch(fetchUrl, {
                     headers,
                     credentials: 'include'
                 });

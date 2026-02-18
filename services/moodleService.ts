@@ -17,11 +17,13 @@ export const submitLtiGrade = async (
       'Content-Type': 'application/json'
     };
 
-    if (ltiData.ltik) {
-      headers['Authorization'] = `Bearer ${ltiData.ltik}`;
-    }
+    // if (ltiData.ltik) {
+    //   headers['Authorization'] = `Bearer ${ltiData.ltik}`;
+    // }
 
-    const response = await fetch(`${API_URL}/api/grade`, {
+    const fetchUrl = ltiData.ltik ? `${API_URL}/api/grade?ltik=${ltiData.ltik}` : `${API_URL}/api/grade`;
+
+    const response = await fetch(fetchUrl, {
       method: 'POST',
       headers: headers,
       // IMPORTANT: Send cookies (session) to backend
