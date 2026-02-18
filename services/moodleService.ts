@@ -17,9 +17,11 @@ export const submitLtiGrade = async (
       'Content-Type': 'application/json'
     };
 
-    // if (ltiData.ltik) {
-    //   headers['Authorization'] = `Bearer ${ltiData.ltik}`;
-    // }
+    // Send LTIK in Header (Backup)
+    if (ltiData.ltik) {
+      headers['Authorization'] = `Bearer ${ltiData.ltik}`;
+      headers['LTIK'] = ltiData.ltik;
+    }
 
     const fetchUrl = ltiData.ltik ? `${API_URL}/api/grade?ltik=${ltiData.ltik}` : `${API_URL}/api/grade`;
 

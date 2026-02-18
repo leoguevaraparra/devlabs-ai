@@ -23,13 +23,16 @@ export const useLTI = () => {
 
             try {
                 const headers: HeadersInit = {};
-                // if (ltik) {
-                //    headers['Authorization'] = `Bearer ${ltik}`;
-                //    console.log("[LTI] Found LTIK in URL, using for Auth.");
-                // }
+                // Send LTIK in Header (Backup)
+                if (ltik) {
+                    headers['Authorization'] = `Bearer ${ltik}`;
+                    headers['LTIK'] = ltik; // Try custom header too
+                }
 
-                // IMPORTANT: Send credentials AND ltik in Query String (ltijs fallback)
+                // IMPORTANT: Send credentials AND ltik in Query String (Primary)
                 const fetchUrl = ltik ? `${API_URL}/api/me?ltik=${ltik}` : `${API_URL}/api/me`;
+
+                console.log(`[LTI] Fetching session from: ${fetchUrl}`);
 
                 const res = await fetch(fetchUrl, {
                     headers,
