@@ -16,9 +16,24 @@ export const useLTI = () => {
     useEffect(() => {
         const checkBackendSession = async () => {
             const API_URL = import.meta.env.VITE_API_URL || '';
+
+            // Capture LTIK from URL (passed by Backend redirect)
+            const params = new URLSearchParams(window.location.search);
+            const ltik = params.get('ltik');
+
             try {
-                // IMPORTANT: Send credentials to check if we have a session cookie
-                const res = await fetch(`${API_URL}/api/me`, { credentials: 'include' });
+                const headers: HeadersInit = {};
+                if (ltik) {
+                    headers['Authorization'] = `Bearer ${ltik}`;
+                    console.log("[LTI] Found LTIK in URL, using for Auth.");
+                }
+
+                // IMPORTANT: Send credentials AND Authorization header
+                const res = await fetch(`${API_URL}/api/me`, {
+                    headers,
+                    credentials: 'include'
+                });
+
                 if (res.ok) {
                     const data = await res.json();
                     setMoodleState({
@@ -29,12 +44,19 @@ export const useLTI = () => {
                             contextId: data.context.id,
                             contextLabel: data.context.label || 'Moodle Course',
                             outcomeServiceUrl: '', // Backend handles this
-                            resultSourcedId: ''
+                            resultSourcedId: '',
+                            ltik: ltik || undefined // Store LTIK for future requests
                         },
                         lastGradeSent: null,
                         lastGradeTime: null
                     });
                     setLtiFlow('IDLE');
+
+                    // Clean URL (optional but nice)
+                    if (ltik) {
+                        const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                        window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
+                    }
                 }
             } catch (err) {
                 console.log("[LTI] No valid backend session found. Switching to Dev/Simulation Mode.");

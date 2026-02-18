@@ -13,11 +13,17 @@ export const submitLtiGrade = async (
   const API_URL = import.meta.env.VITE_API_URL || '';
 
   try {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json'
+    };
+
+    if (ltiData.ltik) {
+      headers['Authorization'] = `Bearer ${ltiData.ltik}`;
+    }
+
     const response = await fetch(`${API_URL}/api/grade`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: headers,
       // IMPORTANT: Send cookies (session) to backend
       credentials: 'include',
       body: JSON.stringify({

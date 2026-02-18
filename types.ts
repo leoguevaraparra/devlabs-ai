@@ -43,6 +43,7 @@ export interface LtiLaunchData {
   contextLabel: string; // Nombre corto del curso
   outcomeServiceUrl?: string; // URL para devolver la nota
   resultSourcedId?: string; // Token único para la nota del estudiante
+  ltik?: string; // LTI Session Token (Bypass Cookies)
 }
 
 export interface MoodleState {
