@@ -111,12 +111,14 @@ export const useLTI = () => {
             } else {
                 console.warn("[LTI] Token rejected by backend.", res.status);
                 sessionStorage.removeItem('ltik');
-                setLtiMessage('Error: Sesión expirada o inválida. Intente recargar desde Moodle.');
+                // DEBUG INFO FOR USER
+                const urlDebug = apiUrl ? apiUrl : '/api (Proxy)';
+                setLtiMessage(`Error ${res.status}: Token rechazado al conectar con ${urlDebug}.`);
                 setLtiFlow('ERROR'); // Stay in Error state specifically
             }
         } catch (err) {
             console.error("[LTI] Network error:", err);
-            setLtiMessage('Error de conexión con el Servidor.');
+            setLtiMessage(`Error de red: ${err instanceof Error ? err.message : String(err)}`);
             setLtiFlow('ERROR');
         }
     };
