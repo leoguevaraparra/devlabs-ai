@@ -23,6 +23,9 @@ export const useLTI = () => {
          * Runs once on mount to determine the current LTI state.
          */
         const initializeLTI = async () => {
+            // Force relative path to use Netlify Proxy if VITE_API_URL is effectively the same domain or empty
+            // Otherwise, respect the env var (but risk CORS).
+            // Recommendation: In Netlify, leave VITE_API_URL empty/undefined to use the proxy rule.
             const API_URL = import.meta.env.VITE_API_URL || '';
 
             // 1. Token Discovery Strategy
@@ -33,27 +36,27 @@ export const useLTI = () => {
             let ltik = params.get('ltik') || hashParams.get('ltik');
 
             if (ltik) {
-                // New session: Persist token
-                console.log("[LTI] New LTIK found in URL. Saving to session storage.");
+                console.log("[LTI] New LTIK found. Initializing validation...");
+                setLtiFlow('LAUNCH'); // Show loading screen
+                setLtiMessage('Validando credenciales LTI...');
+
                 sessionStorage.setItem('ltik', ltik);
 
-                // Optional: Clean URL to hide token (security best practice)
                 const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
                 window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
-
             } else {
-                // Reload/Navigation: Retrieve persisted token
                 ltik = sessionStorage.getItem('ltik');
                 if (ltik) {
-                    console.log("[LTI] LTIK restored from session storage.");
+                    console.log("[LTI] LTIK restored from storage.");
+                    setLtiFlow('LAUNCH'); // Show loading screen
+                    setLtiMessage('Restaurando sesión...');
                 }
             }
 
             // 2. OIDC/Launch Handling (Initial Handshake)
             if (params.has('iss') && params.has('login_hint')) {
                 setLtiFlow('LOGIN');
-                setLtiMessage('Validando sesión OIDC con Moodle...');
-                setTimeout(() => setLtiFlow('IDLE'), 1500); // Simulating redirect handoff
+                setLtiMessage('Iniciando sesión OIDC...');
                 return;
             }
 
@@ -77,7 +80,9 @@ export const useLTI = () => {
      */
     const validateBackendSession = async (apiUrl: string, ltik: string) => {
         try {
-            console.log(`[LTI] Validating session with backend...`);
+            // Logic to use Proxy if apiUrl is absolute but we want relative
+            // For now, adhere to env var. 
+            // If user unsets VITE_API_URL in Netlify, apiUrl becomes '', creating relative '/api/me' request.
 
             const res = await fetch(`${apiUrl}/api/me`, {
                 headers: {
@@ -88,7 +93,7 @@ export const useLTI = () => {
 
             if (res.ok) {
                 const data = await res.json();
-                console.log("[LTI] Session checks out. User:", data.userId);
+                console.log("[LTI] Session Authorized:", data.userId);
 
                 setMoodleState({
                     isConnected: true,
@@ -97,18 +102,22 @@ export const useLTI = () => {
                         roles: Array.isArray(data.roles) ? data.roles.join(', ') : data.roles,
                         contextId: data.context?.id || 'Unknown',
                         contextLabel: data.context?.label || 'Moodle Course',
-                        ltik: ltik // Store for future requests
+                        ltik: ltik
                     },
                     lastGradeSent: null,
                     lastGradeTime: null
                 });
-                setLtiFlow('IDLE');
+                setLtiFlow('IDLE'); // Ready
             } else {
-                console.warn("[LTI] Backend rejected token.", res.status);
-                sessionStorage.removeItem('ltik'); // Clear invalid token
+                console.warn("[LTI] Token rejected by backend.", res.status);
+                sessionStorage.removeItem('ltik');
+                setLtiMessage('Error: Sesión expirada o inválida. Intente recargar desde Moodle.');
+                setLtiFlow('ERROR'); // Stay in Error state specifically
             }
         } catch (err) {
-            console.error("[LTI] Network error validating session:", err);
+            console.error("[LTI] Network error:", err);
+            setLtiMessage('Error de conexión con el Servidor.');
+            setLtiFlow('ERROR');
         }
     };
 
