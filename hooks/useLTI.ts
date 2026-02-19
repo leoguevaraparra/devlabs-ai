@@ -1,174 +1,156 @@
 import { useState, useEffect } from 'react';
 import { LtiLaunchData, MoodleState } from '../types';
 import { jwtDecode } from "jwt-decode";
+import { INITIAL_MOODLE_STATE } from '../constants';
 
+/**
+ * Custom hook to manage LTI 1.3 Launch flow and Moodle Session state.
+ * 
+ * Handles:
+ * 1. Extraction of LTIK (LTI Token) from URL or Storage.
+ * 2. Session persistence via sessionStorage (to survive reloads in iframes).
+ * 3. Token decoding and validation.
+ * 4. State management for the Moodle connection.
+ */
 export const useLTI = () => {
     const [ltiFlow, setLtiFlow] = useState<'IDLE' | 'REGISTRATION' | 'LOGIN' | 'LAUNCH' | 'ERROR'>('IDLE');
     const [ltiMessage, setLtiMessage] = useState<string>('');
-    const [moodleState, setMoodleState] = useState<MoodleState>({
-        isConnected: false,
-        ltiData: null,
-        lastGradeSent: null,
-        lastGradeTime: null
-    });
+    const [moodleState, setMoodleState] = useState<MoodleState>(INITIAL_MOODLE_STATE);
 
-    // Check for active backend session
     useEffect(() => {
-        const checkBackendSession = async () => {
+        /**
+         * Core initialization logic.
+         * Runs once on mount to determine the current LTI state.
+         */
+        const initializeLTI = async () => {
             const API_URL = import.meta.env.VITE_API_URL || '';
 
-            // Capture LTIK from URL (passed by Backend redirect)
+            // 1. Token Discovery Strategy
+            // Search in Query String (standard), Hash (some routers), or Session Storage (reloads)
             const params = new URLSearchParams(window.location.search);
-            const ltik = params.get('ltik');
+            const hashParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
 
-            try {
-                const headers: HeadersInit = {};
-                // Send LTIK in Header (Backup)
+            let ltik = params.get('ltik') || hashParams.get('ltik');
+
+            if (ltik) {
+                // New session: Persist token
+                console.log("[LTI] New LTIK found in URL. Saving to session storage.");
+                sessionStorage.setItem('ltik', ltik);
+
+                // Optional: Clean URL to hide token (security best practice)
+                const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
+
+            } else {
+                // Reload/Navigation: Retrieve persisted token
+                ltik = sessionStorage.getItem('ltik');
                 if (ltik) {
-                    headers['Authorization'] = `Bearer ${ltik}`;
-                    headers['LTIK'] = ltik; // Try custom header too
+                    console.log("[LTI] LTIK restored from session storage.");
                 }
+            }
 
-                // IMPORTANT: Send credentials AND ltik in Query String (Primary)
-                const fetchUrl = ltik ? `${API_URL}/api/me?ltik=${ltik}` : `${API_URL}/api/me`;
+            // 2. OIDC/Launch Handling (Initial Handshake)
+            if (params.has('iss') && params.has('login_hint')) {
+                setLtiFlow('LOGIN');
+                setLtiMessage('Validando sesión OIDC con Moodle...');
+                setTimeout(() => setLtiFlow('IDLE'), 1500); // Simulating redirect handoff
+                return;
+            }
 
-                console.log(`[LTI] Fetching session from: ${fetchUrl}`);
+            // 3. Backend Session Validation
+            if (ltik) {
+                await validateBackendSession(API_URL, ltik);
+            } else {
+                // No token found - check if we are in a purely client-side launch (id_token)
+                // or if we should fallback to Dev Mode.
+                handleClientSideLaunch(params);
+            }
+        };
 
-                const res = await fetch(fetchUrl, {
-                    headers,
-                    credentials: 'include'
-                });
+        initializeLTI();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
-                if (res.ok) {
-                    const data = await res.json();
-                    setMoodleState({
-                        isConnected: true,
-                        ltiData: {
-                            userId: data.userId,
-                            roles: data.roles.join(', '),
-                            contextId: data.context.id,
-                            contextLabel: data.context.label || 'Moodle Course',
-                            outcomeServiceUrl: '', // Backend handles this
-                            resultSourcedId: '',
-                            ltik: ltik || undefined // Store LTIK for future requests
-                        },
-                        lastGradeSent: null,
-                        lastGradeTime: null
-                    });
-                    setLtiFlow('IDLE');
+    /**
+     * Validates the LTI session with the backend using the discovered LTIK.
+     * Use explicit LTIK passing to bypass 3rd-party cookie blocks.
+     */
+    const validateBackendSession = async (apiUrl: string, ltik: string) => {
+        try {
+            console.log(`[LTI] Validating session with backend...`);
 
-                    // Clean URL (optional but nice)
-                    if (ltik) {
-                        const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-                        window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
-                    }
+            const res = await fetch(`${apiUrl}/api/me`, {
+                headers: {
+                    'Authorization': `Bearer ${ltik}`,
+                    'LTIK': ltik
                 }
-            } catch (err) {
-                console.log("[LTI] No valid backend session found. Switching to Dev/Simulation Mode.");
-                // Fallback for Dev/Testing without active Backend
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                console.log("[LTI] Session checks out. User:", data.userId);
+
                 setMoodleState({
                     isConnected: true,
                     ltiData: {
-                        userId: 'Dev_User',
-                        roles: 'Instructor',
-                        contextId: 'dev_env',
-                        contextLabel: 'Modo Pruebas (Sin Backend)',
-                        outcomeServiceUrl: '',
-                        resultSourcedId: ''
+                        userId: data.userId,
+                        roles: Array.isArray(data.roles) ? data.roles.join(', ') : data.roles,
+                        contextId: data.context?.id || 'Unknown',
+                        contextLabel: data.context?.label || 'Moodle Course',
+                        ltik: ltik // Store for future requests
                     },
                     lastGradeSent: null,
                     lastGradeTime: null
                 });
                 setLtiFlow('IDLE');
+            } else {
+                console.warn("[LTI] Backend rejected token.", res.status);
+                sessionStorage.removeItem('ltik'); // Clear invalid token
             }
-        };
-        // Only check if we are not already in a launch flow (basic check)
-        checkBackendSession();
-    }, []);
-
-    useEffect(() => {
-        const params = new URLSearchParams(window.location.search || window.location.hash.replace('#', '?'));
-
-        // 1. OIDC Initiation (Login)
-        if (params.has('iss') && params.has('login_hint')) {
-            setLtiFlow('LOGIN');
-            setLtiMessage('Validando sesión OIDC con Moodle...');
-            // In a real app, we would redirect to the platform's auth endpoint here.
-            // For this client-side demo, we simulate a successful redirect back with a token.
-            setTimeout(() => {
-                setLtiFlow('IDLE'); // Reset to IDLE or proceed to launch simulation
-                console.log("[LTI] OIDC Login initiated. Redirecting to auth endpoint (simulated).");
-            }, 1000);
-            return;
+        } catch (err) {
+            console.error("[LTI] Network error validating session:", err);
         }
+    };
 
-        // 2. LTI Launch (id_token present)
+    /**
+     * Handles client-side LTI 1.3 Launch (id_token parsing)
+     * Used primarily for demos or when backend is not strictly enforcing session yet.
+     */
+    const handleClientSideLaunch = (params: URLSearchParams) => {
         if (params.has('id_token')) {
             setLtiFlow('LAUNCH');
             setLtiMessage('Procesando LTI 1.3 Launch...');
+
             const idToken = params.get('id_token');
+            if (!idToken) return;
 
-            if (idToken) {
-                try {
-                    const decoded: any = jwtDecode(idToken);
-                    console.log("[LTI] Decoded Token:", decoded);
+            try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const decoded: any = jwtDecode(idToken);
+                console.log("[LTI] Decoded ID Token:", decoded);
 
-                    // LTI 1.3 Claims Map
-                    // https://purl.imsglobal.org/spec/lti/claim/resource_link
-                    // https://purl.imsglobal.org/spec/lti/claim/context
-                    // https://purl.imsglobal.org/spec/lti/claim/roles
-                    // https://purl.imsglobal.org/spec/lti-ags/claim/endpoint
+                const ltiData: LtiLaunchData = {
+                    userId: decoded.sub || 'Unknown',
+                    roles: decoded['https://purl.imsglobal.org/spec/lti/claim/roles']?.[0] || 'Learner',
+                    contextId: decoded['https://purl.imsglobal.org/spec/lti/claim/context']?.id || 'Unknown',
+                    contextLabel: decoded['https://purl.imsglobal.org/spec/lti/claim/context']?.label || 'Moodle Course',
+                    ltik: undefined // No LTIK in this flow
+                };
 
-                    const errors = [];
-                    // Basic Validation
-                    if (decoded.iss !== 'https://moodle.riwi.io' && !decoded.iss.includes('http')) errors.push('Invalid Issuer');
-                    if (!decoded.sub) errors.push('Missing Subject (User ID)');
-
-                    const ltiData: LtiLaunchData = {
-                        userId: decoded.sub || 'Unknown_User',
-                        roles: decoded['https://purl.imsglobal.org/spec/lti/claim/roles']?.[0] || 'Learner',
-                        contextId: decoded['https://purl.imsglobal.org/spec/lti/claim/context']?.id || 'Unknown_Course',
-                        contextLabel: decoded['https://purl.imsglobal.org/spec/lti/claim/context']?.label || 'Curso Sin Nombre',
-                        outcomeServiceUrl: decoded['https://purl.imsglobal.org/spec/lti-ags/claim/endpoint']?.lineitem || '',
-                        resultSourcedId: decoded.sub // Using sub as generic identifier for grade sync in this demo
-                    };
-
-                    setMoodleState({
-                        isConnected: true,
-                        ltiData: ltiData,
-                        lastGradeSent: null,
-                        lastGradeTime: null
-                    });
-                    setLtiFlow('IDLE');
-
-                } catch (error) {
-                    console.error("[LTI] Token Error:", error);
-                    setLtiFlow('ERROR');
-                    setLtiMessage('Error decodificando LTI Token. Verifica la consola.');
-                }
+                setMoodleState({
+                    isConnected: true,
+                    ltiData: ltiData,
+                    lastGradeSent: null,
+                    lastGradeTime: null
+                });
+                setLtiFlow('IDLE');
+            } catch (error) {
+                console.error("[LTI] Token Decode Error:", error);
+                setLtiFlow('ERROR');
+                setLtiMessage('Error procesando el token LTI.');
             }
-            return;
         }
-
-        // 3. Default Dev/Standalone Mode
-        if (!moodleState.isConnected && !params.has('id_token') && !params.has('iss')) {
-            // Optional: Auto-connect as "Dev User" if not in production
-            /*
-           setMoodleState({
-               isConnected: true,
-               ltiData: {
-                   userId: 'Dev_User',
-                   roles: 'Instructor',
-                   contextId: 'dev_env',
-                   contextLabel: 'Ambiente de Desarrollo',
-               },
-               lastGradeSent: null,
-               lastGradeTime: null
-           });
-           */
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    };
 
     return { ltiFlow, ltiMessage, moodleState, setMoodleState };
 };

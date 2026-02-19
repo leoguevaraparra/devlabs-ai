@@ -1,23 +1,46 @@
-import { LtiLaunchData } from "../types";
+import { LtiLaunchData, EvaluationResult } from '../types';
 
-// Simula el envío de una calificación a Moodle usando el protocolo LTI
-export const submitLtiGrade = async (
-  ltiData: LtiLaunchData,
-  score: number
-): Promise<{ success: boolean; xmlLog: string }> => {
-  // En LTI, las notas se envían como un valor decimal entre 0.0 y 1.0
-  const normalizedScore = score / 100;
+const API_URL = import.meta.env.VITE_API_URL || '';
 
-  // Send grade to local backend middleware which handles LTI signing
-  // Use VITE_API_URL if defined, otherwise relative path (for proxy/same-origin)
-  const API_URL = import.meta.env.VITE_API_URL || '';
+/**
+ * Sends a grade to Moodle via the backend using the LTI 1.3 Assignment and Grade Service (AGS).
+ * 
+ * @param ltiData - Context data containing the user ID, LTI keys, and endpoint.
+ * @param evaluation - The result of the code evaluation (score and feedback).
+ * @returns boolean indicating success or failure.
+ */
+export const submitLtiGrade = async (ltiData: LtiLaunchData | null, evaluation: EvaluationResult): Promise<boolean> => {
+  console.group('[Moodle Service] Submitting Grade');
+
+  if (!ltiData) {
+    console.warn('❌ No active LTI session found. Cannot sync grade.');
+    console.groupEnd();
+    return false;
+  }
+
+  if (!ltiData.userId || ltiData.userId === 'Dev_User') {
+    console.info('⚠️ Development mode or invalid user. Skipping grade sync.');
+    console.groupEnd();
+    // Return true to simulate success in dev mode
+    return true;
+  }
 
   try {
+    const payload = {
+      userId: ltiData.userId,
+      grade: evaluation.score,
+      comment: evaluation.feedback || 'Evaluación automática completada.',
+      // Pass LTIK if available to authenticate the request
+      ltik: ltiData.ltik
+    };
+
+    console.log('📤 Sending payload:', payload);
+
     const headers: HeadersInit = {
       'Content-Type': 'application/json'
     };
 
-    // Send LTIK in Header (Backup)
+    // Add LTIK to Headers if available
     if (ltiData.ltik) {
       headers['Authorization'] = `Bearer ${ltiData.ltik}`;
       headers['LTIK'] = ltiData.ltik;
@@ -28,41 +51,22 @@ export const submitLtiGrade = async (
     const response = await fetch(fetchUrl, {
       method: 'POST',
       headers: headers,
-      // IMPORTANT: Send cookies (session) to backend
-      credentials: 'include',
-      body: JSON.stringify({
-        score: score,
-        ltiData: ltiData
-      })
+      body: JSON.stringify(payload)
     });
 
     if (!response.ok) {
-      throw new Error('Failed to submit grade to backend');
+      const errorText = await response.text();
+      throw new Error(`Server returned ${response.status}: ${errorText}`);
     }
 
-    console.log("%c[Moodle LTI] Calificación enviada al Backend con éxito.", "color: #2ecc71");
-    return {
-      success: true,
-      xmlLog: "Sent to /api/grade (Backend handles AGS)"
-    };
+    const result = await response.json();
+    console.log('✅ Grade synced successfully:', result);
+    console.groupEnd();
+    return true;
 
   } catch (error) {
-    console.warn("[Moodle LTI] Backend no disponible o error en envío. Simulando éxito en consola.", error);
-
-    // Fallback Simulation (for testing without backend)
-    const agsPayload = {
-      timestamp: new Date().toISOString(),
-      scoreGiven: score / 100,
-      activityProgress: "Completed",
-      gradingProgress: "FullyGraded",
-      userId: ltiData.userId,
-      note: "Fallback Simulation (No Backend)"
-    };
-    console.log("Fallback Payload:", agsPayload);
-
-    return {
-      success: true,
-      xmlLog: "Simulation: Backend Unreachable. Payload logged to console."
-    };
+    console.error('❌ Error syncing grade:', error);
+    console.groupEnd();
+    return false;
   }
 };

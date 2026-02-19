@@ -48,7 +48,7 @@ const App: React.FC = () => {
     const result = await runEvaluation(currentExercise, code);
 
     if (result && result.passed && moodleState.isConnected && moodleState.ltiData) {
-      await submitLtiGrade(moodleState.ltiData, result.score);
+      await submitLtiGrade(moodleState.ltiData, result);
       setMoodleState(prev => ({
         ...prev,
         lastGradeSent: result.score,
