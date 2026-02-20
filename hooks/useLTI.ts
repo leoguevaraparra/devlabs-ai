@@ -111,11 +111,12 @@ export const useLTI = () => {
                 });
                 setLtiFlow('IDLE'); // Ready
             } else {
-                console.warn("[LTI] Token rejected by backend.", res.status);
+                const errorText = await res.text();
+                console.warn("[LTI] Token rejected by backend.", res.status, errorText);
                 sessionStorage.removeItem('ltik');
                 // DEBUG INFO FOR USER
                 const urlDebug = apiUrl ? apiUrl : '/api (Proxy)';
-                setLtiMessage(`Error ${res.status}: Token rechazado al conectar con ${urlDebug}.`);
+                setLtiMessage(`Error ${res.status}: Token rechazado al conectar con ${urlDebug}. Detalles: ${errorText}`);
                 setLtiFlow('ERROR'); // Stay in Error state specifically
             }
         } catch (err) {
