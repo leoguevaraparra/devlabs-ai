@@ -84,7 +84,9 @@ export const useLTI = () => {
             // For now, adhere to env var. 
             // If user unsets VITE_API_URL in Netlify, apiUrl becomes '', creating relative '/api/me' request.
 
-            const res = await fetch(`${apiUrl}/api/me`, {
+            // Added ?ltik= query parameter. Proxies sometimes strip Authorization headers,
+            // but they never strip query parameters. This guarantees the backend gets the session.
+            const res = await fetch(`${API_URL}/api/me?ltik=${ltik}`, {
                 headers: {
                     'Authorization': `Bearer ${ltik}`,
                     'LTIK': ltik

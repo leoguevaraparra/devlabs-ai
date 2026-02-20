@@ -10,6 +10,7 @@ import CodeEditor from './components/CodeEditor';
 import Console from './components/Console';
 import MoodleHeader from './components/MoodleHeader';
 
+// Last Deployed: 2026-02-19 T15:24
 const App: React.FC = () => {
   const { ltiFlow, ltiMessage, moodleState, setMoodleState } = useLTI();
   const { isEvaluating, evaluation, error, runEvaluation, clearEvaluation } = useCodeEvaluator();
