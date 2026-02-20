@@ -86,7 +86,7 @@ export const useLTI = () => {
 
             // Added ?ltik= query parameter. Proxies sometimes strip Authorization headers,
             // but they never strip query parameters. This guarantees the backend gets the session.
-            const res = await fetch(`${API_URL}/api/me?ltik=${ltik}`, {
+            const res = await fetch(`${apiUrl}/api/me?ltik=${ltik}`, {
                 headers: {
                     'Authorization': `Bearer ${ltik}`,
                     'LTIK': ltik
