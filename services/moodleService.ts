@@ -28,7 +28,7 @@ export const submitLtiGrade = async (ltiData: LtiLaunchData | null, evaluation: 
   try {
     const payload = {
       userId: ltiData.userId,
-      grade: evaluation.score,
+      score: evaluation.score,
       comment: evaluation.feedback || 'Evaluación automática completada.',
       // Pass LTIK if available to authenticate the request
       ltik: ltiData.ltik

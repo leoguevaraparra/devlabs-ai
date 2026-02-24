@@ -1,17 +1,18 @@
 import React, { useState, useMemo } from 'react';
-import { Exercise, Difficulty } from '../types';
+import { Exercise, Difficulty, GlobalProgress } from '../types';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 interface ExerciseListProps {
   exercises: Exercise[];
   selectedId: string;
+  progress: GlobalProgress;
   onSelect: (id: string) => void;
   isOpen?: boolean;
   onClose?: () => void;
 }
 
-const ExerciseList: React.FC<ExerciseListProps> = ({ exercises, selectedId, onSelect, isOpen = true, onClose }) => {
+const ExerciseList: React.FC<ExerciseListProps> = ({ exercises, selectedId, progress, onSelect, isOpen = true, onClose }) => {
   const [activeTab, setActiveTab] = useState<Difficulty>(Difficulty.EASY);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -111,10 +112,15 @@ const ExerciseList: React.FC<ExerciseListProps> = ({ exercises, selectedId, onSe
                 </div>
 
                 <h3 className={clsx(
-                  "text-sm font-semibold mb-1 transition-colors relative z-10",
+                  "text-sm font-semibold mb-1 transition-colors relative z-10 flex items-center justify-between",
                   selectedId === ex.id ? "text-blue-100" : "text-gray-300 group-hover:text-white"
                 )}>
-                  {ex.title}
+                  <span>{ex.title}</span>
+                  {progress[ex.id]?.passed && (
+                    <span title="Completado" className="text-green-500 text-xs ml-2 flex-shrink-0">
+                      ✅
+                    </span>
+                  )}
                 </h3>
 
                 <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed relative z-10">

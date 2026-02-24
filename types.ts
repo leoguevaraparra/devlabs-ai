@@ -36,8 +36,17 @@ export interface EvaluationResult {
   suggestions: string[];
 }
 
+export interface ExerciseProgress {
+  code: string;
+  passed: boolean;
+  score: number;
+}
+
+export type GlobalProgress = Record<string, ExerciseProgress>;
+
 export interface LtiLaunchData {
   userId: string;
+  name?: string;
   roles: string; // e.g. "Learner", "Instructor"
   contextId: string; // ID del curso en Moodle
   contextLabel: string; // Nombre corto del curso

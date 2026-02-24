@@ -101,9 +101,10 @@ export const useLTI = () => {
                     isConnected: true,
                     ltiData: {
                         userId: data.userId,
+                        name: data.userInfo?.name || data.userInfo?.given_name || undefined,
                         roles: Array.isArray(data.roles) ? data.roles.join(', ') : data.roles,
                         contextId: data.context?.id || 'Unknown',
-                        contextLabel: data.context?.label || 'Moodle Course',
+                        contextLabel: data.context?.label || data.context?.title || 'Curso Desconocido',
                         ltik: ltik
                     },
                     lastGradeSent: null,
@@ -145,9 +146,10 @@ export const useLTI = () => {
 
                 const ltiData: LtiLaunchData = {
                     userId: decoded.sub || 'Unknown',
+                    name: decoded.name || decoded.given_name || undefined,
                     roles: decoded['https://purl.imsglobal.org/spec/lti/claim/roles']?.[0] || 'Learner',
                     contextId: decoded['https://purl.imsglobal.org/spec/lti/claim/context']?.id || 'Unknown',
-                    contextLabel: decoded['https://purl.imsglobal.org/spec/lti/claim/context']?.label || 'Moodle Course',
+                    contextLabel: decoded['https://purl.imsglobal.org/spec/lti/claim/context']?.label || decoded['https://purl.imsglobal.org/spec/lti/claim/context']?.title || 'Moodle Course',
                     ltik: undefined // No LTIK in this flow
                 };
 

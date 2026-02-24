@@ -325,6 +325,17 @@ export const SAMPLE_EXERCISES: Exercise[] = [
     instructions: '1. Función `fibonacci(n)`.\n2. Retorna una lista con los primeros n números de la sucesión.\n3. [0, 1, 1, 2, 3, ...]',
     initialCode: 'def fibonacci(n):\n    if n <= 0: return []\n    seq = [0, 1]\n    # Tu código',
     hints: ['seq.append(seq[-1] + seq[-2])']
+  },
+  {
+    id: 'py-030',
+    title: 'Subarreglo de Suma Máxima',
+    description: 'Encuentra la suma contigua más grande (Algoritmo de Kadane).',
+    difficulty: Difficulty.HARD,
+    category: Category.ALGORITHMS,
+    language: ProgrammingLanguage.PYTHON,
+    instructions: '1. Crea una función `max_subarray_sum(arr)`.\n2. Dado un arreglo de enteros, encuentra el subarreglo contiguo (con al menos un número) que tenga la mayor suma.\n3. Retorna esa suma.\n4. Ejemplo: [-2, 1, -3, 4, -1, 2, 1, -5, 4] -> 6 (el subarreglo es [4, -1, 2, 1]).',
+    initialCode: 'def max_subarray_sum(arr):\n    # Implementa el algoritmo de Kadane\n    pass',
+    hints: ['Usa dos variables: max_actual y max_global', 'Itera actualizando max_actual = max(num, max_actual + num)']
   }
 ];
 

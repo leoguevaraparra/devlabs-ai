@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { SAMPLE_EXERCISES } from './constants';
-import { Exercise } from './types';
+import { Exercise, GlobalProgress, ExerciseProgress } from './types';
 import { useLTI } from './hooks/useLTI';
 import { useCodeEvaluator } from './hooks/useCodeEvaluator';
 import { submitLtiGrade } from './services/moodleService';
@@ -16,8 +16,31 @@ const App: React.FC = () => {
   const { isEvaluating, evaluation, error, runEvaluation, clearEvaluation } = useCodeEvaluator();
 
   const [currentExercise, setCurrentExercise] = useState<Exercise>(SAMPLE_EXERCISES[0]);
-  const [code, setCode] = useState<string>(SAMPLE_EXERCISES[0].initialCode);
+  const [progress, setProgress] = useState<GlobalProgress>(() => {
+    const saved = localStorage.getItem('devlab_progress');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { return {}; }
+    }
+    return {};
+  });
+  const [code, setCode] = useState<string>(() => {
+    const saved = localStorage.getItem('devlab_progress');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed[SAMPLE_EXERCISES[0].id]) {
+          return parsed[SAMPLE_EXERCISES[0].id].code;
+        }
+      } catch (e) { }
+    }
+    return SAMPLE_EXERCISES[0].initialCode;
+  });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const progressValues = Object.values(progress) as ExerciseProgress[];
+  const totalExercises = SAMPLE_EXERCISES.length;
+  const completedCount = progressValues.filter(p => p.passed).length;
+  const globalScore = progressValues.reduce((acc, curr) => acc + (curr.score || 0), 0) / totalExercises;
 
   useEffect(() => {
     if (error) {
@@ -26,7 +49,12 @@ const App: React.FC = () => {
   }, [error]);
 
   useEffect(() => {
-    setCode(currentExercise.initialCode);
+    localStorage.setItem('devlab_progress', JSON.stringify(progress));
+  }, [progress]);
+
+  useEffect(() => {
+    const savedProgress = progress[currentExercise.id];
+    setCode(savedProgress ? savedProgress.code : currentExercise.initialCode);
     clearEvaluation();
     // Close sidebar on mobile when exercise is selected
     if (window.innerWidth < 1024) {
@@ -38,9 +66,6 @@ const App: React.FC = () => {
   const handleExerciseSelect = (id: string) => {
     const ex = SAMPLE_EXERCISES.find(e => e.id === id);
     if (ex) {
-      if (code !== currentExercise.initialCode && !window.confirm("¿Cambiar de ejercicio? Se perderán los cambios actuales.")) {
-        return;
-      }
       setCurrentExercise(ex);
     }
   };
@@ -48,14 +73,40 @@ const App: React.FC = () => {
   const handleRunCode = async () => {
     const result = await runEvaluation(currentExercise, code);
 
-    if (result && result.passed && moodleState.isConnected && moodleState.ltiData) {
-      await submitLtiGrade(moodleState.ltiData, result);
-      setMoodleState(prev => ({
-        ...prev,
-        lastGradeSent: result.score,
-        lastGradeTime: new Date().toLocaleTimeString()
-      }));
+    if (result) {
+      const newProgress = {
+        ...progress,
+        [currentExercise.id]: {
+          code,
+          passed: result.passed,
+          score: result.score
+        }
+      };
+      setProgress(newProgress);
+
+      const newProgressValues = Object.values(newProgress) as ExerciseProgress[];
+      const newGlobalScore = newProgressValues.reduce((acc, curr) => acc + (curr.score || 0), 0) / totalExercises;
+
+      if (moodleState.isConnected && moodleState.ltiData) {
+        await submitLtiGrade(moodleState.ltiData, { ...result, score: newGlobalScore });
+        setMoodleState(prev => ({
+          ...prev,
+          lastGradeSent: newGlobalScore,
+          lastGradeTime: new Date().toLocaleTimeString()
+        }));
+      }
     }
+  };
+
+  const handleCodeChange = (newCode: string) => {
+    setCode(newCode);
+    setProgress(prev => ({
+      ...prev,
+      [currentExercise.id]: {
+        ...(prev[currentExercise.id] || { passed: false, score: 0 }),
+        code: newCode
+      }
+    }));
   };
 
   // Renderizado Condicional para estados de carga LTI
@@ -96,10 +147,27 @@ const App: React.FC = () => {
     <div className="flex flex-col h-screen bg-[#0a0a0a] text-gray-100 font-sans overflow-hidden">
       <MoodleHeader state={moodleState} onMenuClick={() => setIsSidebarOpen(true)} />
 
+      <div className="bg-[#18181b] border-b border-[#27272a] p-3 flex flex-wrap items-center justify-between z-10 relative shadow-sm">
+        <div className="flex items-center gap-4 flex-1 min-w-[250px]">
+          <span className="text-sm font-bold text-gray-400 uppercase tracking-wider text-[10px]">Progreso Global</span>
+          <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden max-w-md">
+            <div
+              className="h-full bg-blue-500 transition-all duration-500"
+              style={{ width: `${(completedCount / totalExercises) * 100}%` }}
+            ></div>
+          </div>
+          <span className="text-xs font-mono text-blue-400 font-bold">{completedCount} / {totalExercises}</span>
+        </div>
+        <div className="text-xs font-mono text-green-400 font-bold ml-4">
+          Total Score: {globalScore.toFixed(1)}%
+        </div>
+      </div>
+
       <div className="flex flex-1 overflow-hidden relative">
         <ExerciseList
           exercises={SAMPLE_EXERCISES}
           selectedId={currentExercise.id}
+          progress={progress}
           onSelect={handleExerciseSelect}
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
@@ -156,7 +224,7 @@ const App: React.FC = () => {
                 <div className="flex-1 relative">
                   <CodeEditor
                     code={code}
-                    onChange={setCode}
+                    onChange={handleCodeChange}
                     language={currentExercise.language}
                   />
                 </div>
@@ -208,7 +276,7 @@ const App: React.FC = () => {
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    Análisis Estático (Pylint Simulator)
+                    Análisis del Tutor IA
                   </h3>
                   {evaluation && (
                     <span className={`text-[10px] px-3 py-1 rounded-full font-bold border ${evaluation.passed ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
