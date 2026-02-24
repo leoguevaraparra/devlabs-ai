@@ -49,6 +49,15 @@ A lo largo de las iteraciones sobre el proyecto, abordamos sistemáticamente opt
 *   Se levantó un endpoint autenticado exclusivo `/api/grade` dentro de nuestro Servidor Node.
 *   Cada vez que la IA emite un veredicto mayor a 0 sobre el código, el Frontend dispara un llamado protegido. El servidor Node intercepta el token, descubre a qué plataforma LTI, curso y alumno pertenece, e invoca el servicio de Moodle (`lti.Grade.SubmitScore(...)`) para asentar la calificación automáticamente en el *Moodle Gradebook*.
 
+### Fase 6: Mejoras de Usabilidad y Sincronización Global
+*   **Progreso Global (Global Score):** Se optimizó la lógica de calificación para que no se envíe a Moodle únicamente la nota del último ejercicio resuelto, sino un **promedio global** calculado a partir de todos los ejercicios del catálogo. Esto refleja de manera fidedigna el progreso total del estudiante en el curso.
+*   **Mejoras en Usabilidad (UI/UX):**
+    *   Implementación de persistencia local (`localStorage`) para guardar automáticamente el código y estado de resolución de cada reto, evitando pérdida de datos al cambiar de ejercicio.
+    *   Incorporación de indicadores visuales (✅) en la lista de ejercicios y barras de progreso globales en el SideBar del Frontend.
+    *   Eliminación de ventanas emergentes de confirmación molestas, logrando una navegación sin fricción.
+*   **Corrección del Payload de Calificaciones (LTI Grade Sync):** Ajuste estricto de la estructura enviada a la API de Node (de la llave `grade` a `score`), y en el backend, adición explícita de la propiedad requerida `scoreMaximum: 100` e inyección del Score crudo para corregir errores de visualización y desencriptado (`bad decrypt`) que impedían que las notas se plasmaran correctamente en Moodle.
+*   **Metadatos de Estudiante y Curso:** Extracción dinámica de la información nativa profunda del OIDC Token (`userInfo`, `platformContext`) para mostrar el *Nombre Completo del Coder* y el *Nombre Corto del Curso* directamente en el `MoodleHeader.tsx`, mejorando la inmersión de la herramienta LTI.
+
 ## 5. El Despliegue en la Nube
 Para que esto cobrara vida e interactuara con el LMS en el mundo real, alineamos:
 *   **El Backend LTI** en PaaS escalables  cuidando que tuviera variables de encriptación críticas (`LTI_KEY`, origin CORS policy).
