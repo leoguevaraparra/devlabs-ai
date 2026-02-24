@@ -35,7 +35,7 @@ const MoodleHeader: React.FC<MoodleHeaderProps> = ({ state, onMenuClick }) => {
           </div>
 
           <div className="hidden md:flex flex-col ml-4">
-            <span className="text-[10px] text-gray-400 uppercase font-bold">Estudiante</span>
+            <span className="text-[10px] text-gray-400 uppercase font-bold">Coder</span>
             <span className="text-sm font-semibold text-gray-800">
               {state.ltiData?.name || state.ltiData?.userId || 'Usuario Externo'}
             </span>

@@ -103,8 +103,8 @@ export const useLTI = () => {
                         userId: data.userId,
                         name: data.userInfo?.name || data.userInfo?.given_name || undefined,
                         roles: Array.isArray(data.roles) ? data.roles.join(', ') : data.roles,
-                        contextId: data.context?.id || 'Unknown',
-                        contextLabel: data.context?.label || data.context?.title || 'Curso Desconocido',
+                        contextId: data.context?.id || data.context?.context?.id || 'Unknown',
+                        contextLabel: data.context?.label || data.context?.title || data.context?.context?.label || data.context?.context?.title || 'Curso Desconocido',
                         ltik: ltik
                     },
                     lastGradeSent: null,
