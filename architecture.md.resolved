@@ -1,0 +1,55 @@
+# 🏛️ Arquitectura de la Aplicación DevLab Pro
+
+A continuación, se presenta un diagrama visual usando Mermaid que detalla la arquitectura completa de la aplicación, mostrando cómo interactúan el Frontend, el Backend, Moodle (el LMS) y los servicios externos como la API de Gemini de Google.
+
+```mermaid
+graph TD
+    %% Estilos de los Nodos
+    classDef frontend fill:#3b82f6,stroke:#1d4ed8,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef backend fill:#10b981,stroke:#047857,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef moodle fill:#f97316,stroke:#c2410c,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef external fill:#a855f7,stroke:#7e22ce,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef database fill:#64748b,stroke:#334155,stroke-width:2px,color:#fff,font-weight:bold;
+
+    %% Entidades Principales
+    Moodle["📘 Moodle (LMS)<br/>Consumidor LTI"]:::moodle
+    Gemini["🤖 Google Gemini API<br/>Evaluación de Código"]:::external
+
+    subgraph Backend ["Backend Node.js"]
+        Server["🟢 Servidor Express (ltijs)<br/>Proveedor LTI 1.3"]:::backend
+        DB[("🗄️ SQLite Database<br/>(Sesiones y Registros LTI)")]:::database
+    end
+
+    subgraph Frontend ["Frontend React (Vite)"]
+        App["⚛️ Interfaz de Usuario (React)<br/>Editor de Código & Consola"]:::frontend
+        LTISync["🔑 hooks/useLTI.ts<br/>Gestión de Sesión LTI"]:::frontend
+        CodeEval["🧠 hooks/useCodeEvaluator.ts<br/>Integración de IA"]:::frontend
+    end
+
+    %% Relaciones LTI Launch
+    Moodle -->|"1. LTI Launch Request<br/>(Autenticación OIDC)"| Server
+    Server -->|"2. Verifica credenciales y<br/>Guarda contexto LTI"| DB
+    Server -->|"3. Redirige con Token LTIK"| App
+
+    %% Relaciones de la App Frontend
+    App <--> LTISync
+    App <--> CodeEval
+
+    %% Evaluación de Código
+    CodeEval -->|"4. Envía código del estudiante<br/>para su evaluación"| Gemini
+    Gemini -->|"5. Retorna Feedback y Calificación"| CodeEval
+
+    %% Envío de Calificaciones
+    LTISync -->|"6. POST /api/grade<br/>(Con Token LTIK)"| Server
+    Server -->|"7. Sincroniza Calificación<br/>vía LTI Grade Service"| Moodle
+```
+
+## 📝 Descripción de Componentes y Flujo
+
+1. **Lanzamiento LTI (Launch):** El usuario (estudiante o profesor) ingresa desde un curso en Moodle. Moodle realiza una solicitud de lanzamiento LTI 1.3 al **Backend** (Servidor Node.js con `ltijs`).
+2. **Validación y Persistencia:** El Backend valida la solicitud asegurando la identidad del LMS usando llaves criptográficas. Almacena el contexto de la sesión en una base de datos local **SQLite**.
+3. **Paso al Frontend:** El Backend redirige al navegador del usuario hacia el **Frontend** (React), añadiendo un token seguro temporal `ltik` en la URL.
+4. **Interacción del Estudiante:** En el Frontend, el estudiante diseña y escribe su código en el editor incorporado. La gestión de este estado y las variables LTI se hace en el hook `useLTI.ts`.
+5. **Evaluación de IA:** Cuando se pide validar o ejecutar el ejercicio, el hook [useCodeEvaluator.ts](file:///c:/Users/LeonardoGuevara/Downloads/devlabai-mod1-sem1/hooks/useCodeEvaluator.ts) usa los servicios para enviar la petición directamente a la **API de Google Gemini**, usando en el proceso sus validaciones (prompts) contra el código del estudiante. Gemini procesa y devuelve retroalimentación analítica y un puntaje.
+6. **Envío de Calificación:** Si se ha conseguido una calificación superior o finalización del módulo, el Frontend se comunica con el Backend enviando una petición HTTP (`POST /api/grade`) autorizada por el token `ltik`.
+7. **Sincronización con Moodle:** El Backend recibe, procesa y usa la funcionalidad Grade Service del estándar LTI, empujando o publicando la calificación directamente en la base de datos de calificaciones del curso de Moodle.
