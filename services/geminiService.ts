@@ -78,6 +78,37 @@ export const evaluateCode = async (
       }
     });
 
+    // Log estructurado de uso de tokens con estimación de costos
+    if (response.usageMetadata) {
+      const inputTokens = response.usageMetadata.promptTokenCount;
+      const outputTokens = response.usageMetadata.candidatesTokenCount;
+      const totalTokens = response.usageMetadata.totalTokenCount;
+
+      // Tarifas de ejemplo (USD por millón de tokens). 
+      // NOTA: Debes verificar los precios actuales de gemini-2.0-flash en la documentación oficial de Google.
+      const CostoPorMillonInputInfo = 0.15; // Ejemplo: 15 centavos por millón
+      const CostoPorMillonOutputInfo = 0.60; // Ejemplo: 60 centavos por millón
+
+      // Cálculo del costo en dólares
+      const estimatedCostUSD = (inputTokens / 1000000) * CostoPorMillonInputInfo +
+        (outputTokens / 1000000) * CostoPorMillonOutputInfo;
+
+      // Log en formato JSON para fácil análisis o importación a Excel/Bases de datos
+      const usageLog = {
+        event: "gemini_api_usage",
+        timestamp: new Date().toISOString(),
+        model: "gemini-2.0-flash", // Importante si luego cambias el modelo dinámicamente
+        exerciseTitle: exercise.title, // Para saber qué ejercicio gastó cuántos tokens
+        inputTokens,
+        outputTokens,
+        totalTokens,
+        estimatedCostUSD: parseFloat(estimatedCostUSD.toFixed(6)) // Redondeado a 6 decimales
+      };
+
+      // Se imprime en una sola línea de JSON
+      console.log(JSON.stringify(usageLog));
+    }
+
     const resultText = response.text;
 
     if (!resultText) {
