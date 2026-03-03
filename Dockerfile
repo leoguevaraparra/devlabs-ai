@@ -48,9 +48,10 @@ RUN npm run build
 FROM nginx:1.27-alpine AS runner
 
 # Labels for image metadata
-LABEL maintainer="devlabs-ai"
-LABEL description="DevLab Pro - Moodle Integration Frontend"
+LABEL maintainer="riwi"
+LABEL description="DevLabs M1-S1 - Moodle Integration Frontend"
 LABEL version="1.0.0"
+LABEL domain="devlabs-m1-s1.riwi.io"
 
 # Remove default Nginx static assets and config
 RUN rm -rf /usr/share/nginx/html/* /etc/nginx/conf.d/default.conf
@@ -60,7 +61,7 @@ COPY <<'EOF' /etc/nginx/conf.d/default.conf
 server {
     listen 80;
     listen [::]:80;
-    server_name _;
+    server_name devlabs-m1-s1.riwi.io;
 
     root /usr/share/nginx/html;
     index index.html;

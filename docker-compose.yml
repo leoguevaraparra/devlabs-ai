@@ -1,5 +1,5 @@
 # ============================================================
-# docker-compose.yml — DevLab Pro (Moodle Integration)
+# docker-compose.yml — DevLabs M1-S1 (devlabs-m1-s1.riwi.io)
 # ============================================================
 # Usage:
 #   Development:  docker compose --profile dev up --build
@@ -13,7 +13,7 @@ services:
   # Frontend — Production (Nginx serving static files)
   # ──────────────────────────────────────────────
   app:
-    container_name: devlabs-frontend
+    container_name: devlabs-m1-s1-frontend
     build:
       context: .
       dockerfile: Dockerfile
@@ -25,7 +25,7 @@ services:
     environment:
       - NODE_ENV=production
     networks:
-      - devlabs-network
+      - devlabs-m1-s1-network
     restart: unless-stopped
     healthcheck:
       test: [ "CMD", "wget", "-qO-", "http://localhost:80/healthz" ]
@@ -40,13 +40,13 @@ services:
   # Frontend — Development (Vite dev server with HMR)
   # ──────────────────────────────────────────────
   app-dev:
-    container_name: devlabs-frontend-dev
+    container_name: devlabs-m1-s1-frontend-dev
     image: node:22-alpine
     working_dir: /app
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
     volumes:
       - .:/app
-      - devlabs_node_modules:/app/node_modules
+      - devlabs_m1_s1_node_modules:/app/node_modules
     ports:
       - "${DEV_PORT:-5173}:5173"
     env_file:
@@ -54,7 +54,7 @@ services:
     environment:
       - NODE_ENV=development
     networks:
-      - devlabs-network
+      - devlabs-m1-s1-network
     restart: unless-stopped
     healthcheck:
       test: [ "CMD", "wget", "-qO-", "http://localhost:5173" ]
@@ -69,15 +69,15 @@ services:
   # Redis — In-memory cache (optional, for future use)
   # ──────────────────────────────────────────────
   redis:
-    container_name: devlabs-redis
+    container_name: devlabs-m1-s1-redis
     image: redis:7-alpine
     ports:
       - "${REDIS_PORT:-6379}:6379"
     command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
     volumes:
-      - devlabs_redis_data:/data
+      - devlabs_m1_s1_redis_data:/data
     networks:
-      - devlabs-network
+      - devlabs-m1-s1-network
     restart: unless-stopped
     healthcheck:
       test: [ "CMD", "redis-cli", "ping" ]
@@ -87,21 +87,20 @@ services:
       start_period: 5s
     profiles:
       - dev
-      - prod
 
 # ──────────────────────────────────────────────
 # Named Volumes — Persistent data
 # ──────────────────────────────────────────────
 volumes:
-  devlabs_node_modules:
+  devlabs_m1_s1_node_modules:
     driver: local
-  devlabs_redis_data:
+  devlabs_m1_s1_redis_data:
     driver: local
 
 # ──────────────────────────────────────────────
 # Custom Network — Service isolation
 # ──────────────────────────────────────────────
 networks:
-  devlabs-network:
+  devlabs-m1-s1-network:
     driver: bridge
-    name: devlabs-network
+    name: devlabs-m1-s1-network
