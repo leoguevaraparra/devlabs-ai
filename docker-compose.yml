@@ -1,0 +1,107 @@
+# ============================================================
+# docker-compose.yml — DevLab Pro (Moodle Integration)
+# ============================================================
+# Usage:
+#   Development:  docker compose --profile dev up --build
+#   Production:   docker compose --profile prod up --build -d
+#   All services: docker compose --profile dev --profile prod up --build
+# ============================================================
+
+services:
+
+  # ──────────────────────────────────────────────
+  # Frontend — Production (Nginx serving static files)
+  # ──────────────────────────────────────────────
+  app:
+    container_name: devlabs-frontend
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_GEMINI_API_KEY: ${VITE_GEMINI_API_KEY:-}
+        VITE_API_URL: ${VITE_API_URL:-}
+    ports:
+      - "${APP_PORT:-80}:80"
+    environment:
+      - NODE_ENV=production
+    networks:
+      - devlabs-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:80/healthz" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    profiles:
+      - prod
+
+  # ──────────────────────────────────────────────
+  # Frontend — Development (Vite dev server with HMR)
+  # ──────────────────────────────────────────────
+  app-dev:
+    container_name: devlabs-frontend-dev
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    volumes:
+      - .:/app
+      - devlabs_node_modules:/app/node_modules
+    ports:
+      - "${DEV_PORT:-5173}:5173"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+    networks:
+      - devlabs-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:5173" ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - dev
+
+  # ──────────────────────────────────────────────
+  # Redis — In-memory cache (optional, for future use)
+  # ──────────────────────────────────────────────
+  redis:
+    container_name: devlabs-redis
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - devlabs_redis_data:/data
+    networks:
+      - devlabs-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    profiles:
+      - dev
+      - prod
+
+# ──────────────────────────────────────────────
+# Named Volumes — Persistent data
+# ──────────────────────────────────────────────
+volumes:
+  devlabs_node_modules:
+    driver: local
+  devlabs_redis_data:
+    driver: local
+
+# ──────────────────────────────────────────────
+# Custom Network — Service isolation
+# ──────────────────────────────────────────────
+networks:
+  devlabs-network:
+    driver: bridge
+    name: devlabs-network
