@@ -42,6 +42,7 @@ const App: React.FC = () => {
   const completedCount = progressValues.filter(p => p.passed).length;
   const globalScore = progressValues.reduce((acc, curr) => acc + (curr.score || 0), 0) / totalExercises;
 
+
   useEffect(() => {
     if (error) {
       alert(`Error: ${error}\n\nPor favor verifica tu configuración (API Key) y reinicia el servidor.`);
@@ -51,6 +52,28 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('devlab_progress', JSON.stringify(progress));
   }, [progress]);
+
+  // Verificar si cambió el usuario activo desde Moodle LTI y resetear localStorage si es necesario
+  useEffect(() => {
+    if (moodleState.isConnected && moodleState.ltiData?.userId) {
+      const currentUserId = moodleState.ltiData.userId;
+      const lastUserId = localStorage.getItem('devlab_last_user_id');
+
+      if (lastUserId && lastUserId !== currentUserId) {
+        // Se detectó un usuario diferente en la misma máquina, resetear el progreso local
+        console.log('[LTI] Nuevo usuario detectado. Limpiando progreso de la sesión anterior...');
+        localStorage.removeItem('devlab_progress');
+        setProgress({});
+        setCurrentExercise(SAMPLE_EXERCISES[0]);
+        setCode(SAMPLE_EXERCISES[0].initialCode);
+        clearEvaluation();
+      }
+
+      // Recordar el ID del usuario actual para futuras recargas o nuevas sesiones en el mismo navegador
+      localStorage.setItem('devlab_last_user_id', currentUserId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moodleState.isConnected, moodleState.ltiData?.userId]);
 
   useEffect(() => {
     const savedProgress = progress[currentExercise.id];
