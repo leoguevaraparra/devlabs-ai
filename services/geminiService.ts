@@ -69,7 +69,7 @@ export const evaluateCode = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash', // Using latest flash model if available or fallback
+      model: 'gemini-2.5-flash', // Using latest flash model if available or fallback
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -85,7 +85,7 @@ export const evaluateCode = async (
       const totalTokens = response.usageMetadata.totalTokenCount;
 
       // Tarifas de ejemplo (USD por millón de tokens). 
-      // NOTA: Debes verificar los precios actuales de gemini-2.0-flash en la documentación oficial de Google.
+      // NOTA: Debes verificar los precios actuales de gemini-2.5-flash en la documentación oficial de Google.
       const CostoPorMillonInputInfo = 0.15; // Ejemplo: 15 centavos por millón
       const CostoPorMillonOutputInfo = 0.60; // Ejemplo: 60 centavos por millón
 
@@ -97,7 +97,7 @@ export const evaluateCode = async (
       const usageLog = {
         event: "gemini_api_usage",
         timestamp: new Date().toISOString(),
-        model: "gemini-2.0-flash", // Importante si luego cambias el modelo dinámicamente
+        model: "gemini-2.5-flash", // Importante si luego cambias el modelo dinámicamente
         exerciseTitle: exercise.title, // Para saber qué ejercicio gastó cuántos tokens
         inputTokens,
         outputTokens,
