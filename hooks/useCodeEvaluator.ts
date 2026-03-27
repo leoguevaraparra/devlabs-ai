@@ -11,6 +11,9 @@ export const useCodeEvaluator = () => {
     const [isEvaluating, setIsEvaluating] = useState(false);
     const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null);
     const [error, setError] = useState<string | null>(null);
+    
+    // Caché en memoria para evitar re-validaciones de código idéntico
+    const [evaluationCache, setEvaluationCache] = useState<Record<string, EvaluationResult>>({});
 
     /**
      * Sends code to the AI service for evaluation.
@@ -18,6 +21,30 @@ export const useCodeEvaluator = () => {
      * @param code - The student's code to evaluate.
      */
     const runEvaluation = async (exercise: Exercise, code: string): Promise<EvaluationResult | null> => {
+        // Prevención básica: Código vacío
+        if (!code || code.trim() === '') {
+            const errResult = { passed: false, score: 0, feedback: "El código no puede estar vacío.", consoleOutput: "", suggestions: [] };
+            setEvaluation(errResult);
+            return errResult;
+        }
+
+        // Prevención básica: Código sin modificar
+        if (code.trim() === exercise.initialCode.trim()) {
+            const errResult = { passed: false, score: 0, feedback: "No has modificado el código inicial. Intenta resolver el ejercicio.", consoleOutput: "", suggestions: [] };
+            setEvaluation(errResult);
+            return errResult;
+        }
+
+        // Clave única para el caché: Combinación del IDE del ejercicio y el código exacto (limpio de espacios extra al final)
+        const cacheKey = `${exercise.id}_${code.trim()}`;
+        
+        // Verificar si este exacto código ya fue evaluado
+        if (evaluationCache[cacheKey]) {
+            console.log("[CodeEvaluator] Obteniendo resultado desde caché local (Ahorro del 100%)");
+            setEvaluation(evaluationCache[cacheKey]);
+            return evaluationCache[cacheKey];
+        }
+
         setIsEvaluating(true);
         setEvaluation(null);
         setError(null);
@@ -29,6 +56,9 @@ export const useCodeEvaluator = () => {
                 throw new Error("No se recibió respuesta del servicio de evaluación.");
             }
 
+            // Guardar en caché el resultado exitoso
+            setEvaluationCache(prev => ({ ...prev, [cacheKey]: result }));
+            
             setEvaluation(result);
             return result;
 

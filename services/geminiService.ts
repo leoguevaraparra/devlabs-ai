@@ -28,53 +28,42 @@ export const evaluateCode = async (
   const evaluationSchema: Schema = {
     type: Type.OBJECT,
     properties: {
-      passed: { type: Type.BOOLEAN, description: "Whether the code is correct and follows PEP 8." },
-      score: { type: Type.NUMBER, description: "A score from 0 to 100." },
-      feedback: { type: Type.STRING, description: "General feedback." },
+      passed: { type: Type.BOOLEAN, description: "True si no hay errores PEP8 importantes ni lógicos." },
+      score: { type: Type.NUMBER, description: "Score 0-100." },
+      feedback: { type: Type.STRING, description: "Feedback corto (max 30 palabras)." },
       consoleOutput: { type: Type.STRING, description: "Simulated execution output or error trace." },
       suggestions: {
         type: Type.ARRAY,
         items: { type: Type.STRING },
-        description: "List of Pylint-style suggestions (e.g., C0103: Variable name doesn't conform to snake_case)."
+        description: "List of max 3 short PEP8/Logic issues."
       }
     },
     required: ["passed", "score", "feedback", "consoleOutput", "suggestions"]
   };
 
+  // PROMPT TOTALMENTE MINIMIZADO PARA AHORRAR TOKENS
+  // Solo se envía la ID del ejercicio (o título corto), las reglas estrictas de salida formales, y el código.
   const prompt = `
-    Act as an advanced Python Static Code Analyzer (like Pylint/MyPy) and an Instructor.
-    
-    Exercise: ${exercise.title}
-    Description: ${exercise.description}
-    Requirements: 
-    ${exercise.instructions}
+Task: Validate Python code.
+Instructions: ${exercise.instructions}
+Code:
+${userCode}
 
-    ---
-    Student Code (Python 3.14):
-    ${userCode}
-    ---
-
-    Task:
-    1. ANALYZE syntax, logic, and PEP 8 compliance.
-    2. EXECUTE the code mentally. Capture standard output.
-    3. VALIDATE if it solves the exercise instructions.
-    4. CHECK for "Clean Code" principles (meaningful names, proper indentation, comments).
-    
-    Output Rules:
-    - 'consoleOutput': The result of running the code. If syntax error, show the traceback.
-    - 'suggestions': Provide specific Pylint-like error codes if applicable (e.g., "E0001: Syntax Error", "C0111: Missing docstring").
-    - 'score': Deduct points for bad styling even if logic works.
-    - Language: Spanish.
+Strict Rules:
+- JSON output ONLY.
+- Feedback: concise Spanish (max 30 words).
+- 'suggestions': max 3 short Pylint-style issues.
   `;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash', // Using latest flash model if available or fallback
+      model: 'gemini-2.5-flash-lite', // Usando Flash-Lite para ahorro del 70%
       contents: prompt,
       config: {
         responseMimeType: "application/json",
         responseSchema: evaluationSchema,
-        temperature: 0.1
+        temperature: 0.1,
+        maxOutputTokens: 250 // MAX OUTPUT TOKENS para evitar verbosidad costosa
       }
     });
 
@@ -84,10 +73,10 @@ export const evaluateCode = async (
       const outputTokens = response.usageMetadata.candidatesTokenCount;
       const totalTokens = response.usageMetadata.totalTokenCount;
 
-      // Tarifas de ejemplo (USD por millón de tokens). 
-      // NOTA: Debes verificar los precios actuales de gemini-2.5-flash en la documentación oficial de Google.
-      const CostoPorMillonInputInfo = 0.15; // Ejemplo: 15 centavos por millón
-      const CostoPorMillonOutputInfo = 0.60; // Ejemplo: 60 centavos por millón
+      // Tarifas de ejemplo Gemini 2.5 Flash-Lite (Mayo 2024 aprox)
+      // Flash-Lite es aprox $0.075 / 1M Input y $0.30 / 1M Output
+      const CostoPorMillonInputInfo = 0.075;
+      const CostoPorMillonOutputInfo = 0.30;
 
       // Cálculo del costo en dólares
       const estimatedCostUSD = (inputTokens / 1000000) * CostoPorMillonInputInfo +
@@ -97,16 +86,16 @@ export const evaluateCode = async (
       const usageLog = {
         event: "gemini_api_usage",
         timestamp: new Date().toISOString(),
-        model: "gemini-2.5-flash", // Importante si luego cambias el modelo dinámicamente
-        exerciseTitle: exercise.title, // Para saber qué ejercicio gastó cuántos tokens
+        model: "gemini-2.5-flash-lite",
+        exerciseId: exercise.id,
         inputTokens,
         outputTokens,
         totalTokens,
-        estimatedCostUSD: parseFloat(estimatedCostUSD.toFixed(6)) // Redondeado a 6 decimales
+        estimatedCostUSD: parseFloat(estimatedCostUSD.toFixed(7))
       };
 
       // Se imprime en una sola línea de JSON
-      console.log(JSON.stringify(usageLog));
+      console.log("[GEMINI COST]:", JSON.stringify(usageLog));
     }
 
     const resultText = response.text;
